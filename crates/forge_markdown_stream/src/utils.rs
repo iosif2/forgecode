@@ -175,7 +175,10 @@ fn append_wrapped_word(
 
         current_line.push_str(&prefix);
         apply_style_transition(current_style, &prefix);
-        remainder = remainder[prefix.len()..].to_string();
+        remainder = remainder
+            .strip_prefix(prefix.as_str())
+            .unwrap_or_default()
+            .to_string();
 
         if !remainder.is_empty() {
             push_wrapped_line(lines, current_line, first_prefix, next_prefix);
@@ -283,15 +286,25 @@ fn parse_atoms(text: &str) -> Vec<WrapAtom> {
     let mut index = 0;
 
     while index < bytes.len() {
-        if bytes[index] != 0x1b {
-            let next_escape = bytes[index..]
-                .iter()
-                .position(|byte| *byte == 0x1b)
-                .map(|offset| index + offset)
+        let Some(current_byte) = bytes.get(index) else {
+            break;
+        };
+
+        if *current_byte != 0x1b {
+            let next_escape = bytes
+                .get(index..)
+                .and_then(|remainder| {
+                    remainder
+                        .iter()
+                        .position(|byte| *byte == 0x1b)
+                        .map(|offset| index + offset)
+                })
                 .unwrap_or(bytes.len());
 
-            for grapheme in text[index..next_escape].graphemes(true) {
-                atoms.push(WrapAtom::Grapheme(grapheme.to_string()));
+            if let Some(segment) = text.get(index..next_escape) {
+                for grapheme in segment.graphemes(true) {
+                    atoms.push(WrapAtom::Grapheme(grapheme.to_string()));
+                }
             }
 
             index = next_escape;
@@ -304,7 +317,11 @@ fn parse_atoms(text: &str) -> Vec<WrapAtom> {
             Some(_) => (index + 2).min(bytes.len()),
             None => bytes.len(),
         };
-        atoms.push(WrapAtom::Escape(text[index..end].to_string()));
+
+        if let Some(sequence) = text.get(index..end) {
+            atoms.push(WrapAtom::Escape(sequence.to_string()));
+        }
+
         index = end;
     }
 
@@ -313,26 +330,31 @@ fn parse_atoms(text: &str) -> Vec<WrapAtom> {
 
 fn parse_csi_escape(bytes: &[u8], start: usize) -> usize {
     let mut index = start + 2;
-    while index < bytes.len() {
-        if (0x40..=0x7e).contains(&bytes[index]) {
+    while let Some(byte) = bytes.get(index) {
+        if (0x40..=0x7e).contains(byte) {
             return index + 1;
         }
+
         index += 1;
     }
+
     bytes.len()
 }
 
 fn parse_osc_escape(bytes: &[u8], start: usize) -> usize {
     let mut index = start + 2;
-    while index < bytes.len() {
-        if bytes[index] == 0x07 {
+    while let Some(byte) = bytes.get(index) {
+        if *byte == 0x07 {
             return index + 1;
         }
-        if bytes[index] == 0x1b && bytes.get(index + 1) == Some(&b'\\') {
+
+        if *byte == 0x1b && bytes.get(index + 1) == Some(&b'\\') {
             return index + 2;
         }
+
         index += 1;
     }
+
     bytes.len()
 }
 
@@ -354,8 +376,8 @@ fn collapse_ansi_codes(code_list: &[String]) -> Vec<String> {
         let params = parse_sgr_params(code);
         let mut index = 0;
 
-        while index < params.len() {
-            match params[index] {
+        while let Some(&param) = params.get(index) {
+            match param {
                 0 => {
                     bold = false;
                     italic = false;
@@ -377,29 +399,19 @@ fn collapse_ansi_codes(code_list: &[String]) -> Vec<String> {
                 23 => italic = false,
                 24 => underline = false,
                 29 => strikeout = false,
-                30..=37 | 90..=97 => fg_color = Some(format!("\x1b[{}m", params[index])),
+                30..=37 | 90..=97 => fg_color = Some(format!("\x1b[{param}m")),
                 39 => fg_color = None,
-                40..=47 | 100..=107 => bg_color = Some(format!("\x1b[{}m", params[index])),
+                40..=47 | 100..=107 => bg_color = Some(format!("\x1b[{param}m")),
                 49 => bg_color = None,
                 38 => {
-                    if index + 4 < params.len() && params[index + 1] == 2 {
-                        fg_color = Some(format!(
-                            "\x1b[38;2;{};{};{}m",
-                            params[index + 2],
-                            params[index + 3],
-                            params[index + 4]
-                        ));
+                    if let Some([2, red, green, blue]) = params.get(index + 1..index + 5) {
+                        fg_color = Some(format!("\x1b[38;2;{red};{green};{blue}m"));
                         index += 4;
                     }
                 }
                 48 => {
-                    if index + 4 < params.len() && params[index + 1] == 2 {
-                        bg_color = Some(format!(
-                            "\x1b[48;2;{};{};{}m",
-                            params[index + 2],
-                            params[index + 3],
-                            params[index + 4]
-                        ));
+                    if let Some([2, red, green, blue]) = params.get(index + 1..index + 5) {
+                        bg_color = Some(format!("\x1b[48;2;{red};{green};{blue}m"));
                         index += 4;
                     }
                 }
