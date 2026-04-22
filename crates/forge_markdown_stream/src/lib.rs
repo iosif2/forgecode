@@ -123,7 +123,10 @@ mod tests {
         fixture.finish().unwrap();
 
         let actual = strip_ansi_escapes::strip(output);
-        String::from_utf8(actual).unwrap().trim_matches('\n').to_string()
+        String::from_utf8(actual)
+            .unwrap()
+            .trim_matches('\n')
+            .to_string()
     }
 
     fn fixture_rendered_output_from_chunks(chunks: &[&str], width: usize) -> String {
@@ -135,7 +138,10 @@ mod tests {
         fixture.finish().unwrap();
 
         let actual = strip_ansi_escapes::strip(output);
-        String::from_utf8(actual).unwrap().trim_matches('\n').to_string()
+        String::from_utf8(actual)
+            .unwrap()
+            .trim_matches('\n')
+            .to_string()
     }
 
     #[test]
@@ -220,11 +226,7 @@ mod tests {
     fn test_streaming_renderer_wraps_nested_blockquotes_with_correct_prefix_width() {
         let fixture = ">> supercalifragilistic\n";
         let actual = fixture_rendered_output(fixture, 12);
-        let expected = concat!(
-            "│ │ supercal\n",
-            "│ │ ifragili\n",
-            "│ │ stic"
-        );
+        let expected = concat!("│ │ supercal\n", "│ │ ifragili\n", "│ │ stic");
 
         assert_eq!(actual, expected);
     }

@@ -8,7 +8,7 @@ use streamdown_parser::ParseEvent;
 use crate::code::CodeHighlighter;
 use crate::heading::render_heading;
 use crate::inline::{render_inline_content, render_inline_elements};
-use crate::list::{render_list_item, ListState};
+use crate::list::{ListState, render_list_item};
 use crate::style::InlineStyler;
 use crate::table::render_table;
 use crate::theme::Theme;

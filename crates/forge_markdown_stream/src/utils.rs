@@ -1,10 +1,11 @@
 //! Utility functions for the markdown renderer.
 
+use std::sync::OnceLock;
+use std::time::Duration;
+
 use streamdown_ansi::utils::{extract_ansi_codes, parse_sgr_params, visible, visible_length};
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
-use std::sync::OnceLock;
-use std::time::Duration;
 
 /// Terminal theme mode (dark or light).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -86,11 +87,7 @@ pub(crate) fn wrap_text_preserving_spaces(
     let mut current_line = String::new();
     let mut current_style: Vec<String> = Vec::new();
     let mut current_width = first_width;
-    let layout = WrapLayout {
-        next_width,
-        first_prefix,
-        next_prefix,
-    };
+    let layout = WrapLayout { next_width, first_prefix, next_prefix };
 
     for segment in segments {
         let line_width = visible_length(&current_line);
@@ -225,7 +222,11 @@ fn take_prefix_fitting(text: &str, max_width: usize) -> Option<String> {
         }
     }
 
-    if result.is_empty() { None } else { Some(result) }
+    if result.is_empty() {
+        None
+    } else {
+        Some(result)
+    }
 }
 
 fn wrap_segments(text: &str) -> Vec<WrapSegment> {
@@ -279,10 +280,7 @@ fn wrap_chunks(text: &str) -> Vec<WrapChunk> {
     if let Some(is_whitespace) = current_is_whitespace
         && !current.is_empty()
     {
-        chunks.push(WrapChunk {
-            content: current,
-            is_whitespace,
-        });
+        chunks.push(WrapChunk { content: current, is_whitespace });
     }
 
     chunks
